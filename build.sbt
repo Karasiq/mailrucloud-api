@@ -1,0 +1,32 @@
+name := "mailrucloud-api"
+
+organization := "com.github.karasiq"
+
+version := "1.0.0-SNAPSHOT"
+
+isSnapshot := version.value.endsWith("SNAPSHOT")
+
+scalaVersion := "2.11.8"
+
+resolvers += "softprops-maven" at "http://dl.bintray.com/content/softprops/maven"
+
+resolvers += Resolver.sonatypeRepo("snapshots")
+
+libraryDependencies ++= {
+  val akkaV = "2.4.16"
+  Seq(
+    "com.typesafe.akka" %% "akka-actor" % akkaV,
+    "com.typesafe.akka" %% "akka-stream" % akkaV,
+    "com.typesafe.akka" %% "akka-http" % "10.0.1",
+    "com.lihaoyi" %% "upickle" % "0.4.3"
+  )                       
+}
+
+scalacOptions ++= Seq("-optimize", "-deprecation", "-feature")
+
+mainClass in Compile := Some("com.karasiq.mailrucloud.test.Main")
+
+licenses := Seq("Apache License, Version 2.0" → url("http://opensource.org/licenses/Apache-2.0"))
+
+lazy val root = (project in file("."))
+  .enablePlugins(JavaAppPackaging)
