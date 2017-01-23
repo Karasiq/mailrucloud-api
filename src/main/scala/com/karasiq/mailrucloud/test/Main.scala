@@ -1,12 +1,17 @@
 package com.karasiq.mailrucloud.test
 
+import java.net.URLEncoder
+import java.nio.file.Paths
+
+import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
-import akka.http.scaladsl.model.headers.{Cookie, HttpCookie, Location, `Set-Cookie`}
+import akka.http.scaladsl.model.headers._
 import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.Sink
+import akka.stream.scaladsl.{FileIO, Sink, Source}
 import akka.util.ByteString
+import com.karasiq.mailrucloud.test.MailRuApiData.EntityPath
 import upickle.Js
 import upickle.Js.Value
 import upickle.default._
@@ -15,15 +20,24 @@ import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, Future}
 import scala.io.StdIn
 import scala.language.{implicitConversions, postfixOps}
+import scala.util.Random
 
 object MailRuApiData {
   case class ApiResponse[T](email: String, body: T, time: Long, status: Int)
-  case class ApiCsrfToken(token: String)
+
+  case class Space(@key("overquota") overused: Boolean, used: Int, total: Int) {
+    override def toString: String = {
+      def asGb(i: Int) = f"${i.toDouble / 1024}%.2f GB"
+      s"[${asGb(used)} of ${asGb(total)} used]"
+    }
+  }
 
   object EntityPath {
     implicit def apply(str: String): EntityPath = {
       EntityPath(str.split("/"))
     }
+
+    val root: EntityPath = "/"
   }
 
   case class EntityPath(path: Seq[String]) {
@@ -36,7 +50,7 @@ object MailRuApiData {
     def `type`: String
     def kind: String
     def name: String
-    def home: String
+    def path: String
     def size: Long
     def rev: Int
     def grev: Int
@@ -50,13 +64,22 @@ object MailRuApiData {
   object EntityCount {
     val empty = EntityCount()
   }
-  case class File(`type`: String, kind: String, name: String, home: String, size: Long, hash: String, rev: Int = 0, grev: Int = 0) extends Entity {
+  case class File(`type`: String, kind: String, name: String, @key("home") path: String, size: Long, hash: String, rev: Int = 0, grev: Int = 0) extends Entity {
     require(`type` == "file")
   }
-  case class Folder(`type`: String, kind: String, name: String, home: String, size: Long, tree: String, rev: Int = 0, grev: Int = 0, count: EntityCount = EntityCount.empty, list: Seq[Entity] = Nil) extends Entity {
+  case class Folder(`type`: String, kind: String, name: String, @key("home") path: String, size: Long, tree: String, rev: Int = 0, grev: Int = 0, count: EntityCount = EntityCount.empty, list: Seq[Entity] = Nil) extends Entity {
     require(`type` == "folder")
   }
 
+  case class Node(count: Int, url: String)
+  case class Nodes(get: Seq[Node], upload: Seq[Node]) {
+    def random: (String, String) = {
+      require(get.nonEmpty && upload.nonEmpty)
+      (get(Random.nextInt(get.length)).url, upload(Random.nextInt(upload.length)).url)
+    }
+  }
+
+  case class ApiCsrfToken(token: String)
   case class CsrfToken(pageId: String, token: String)
   case class Session(email: String, cookies: Seq[HttpCookie]) {
     def header: Cookie = {
@@ -74,7 +97,7 @@ object MailRuCloud {
   )
 
   private implicit val EntityRW = new Writer[Entity] with Reader[Entity] {
-    private implicit val EntityRW = this 
+    private implicit val EntityRW = this
 
     def write0: (Entity) => Value = {
       case file: File ⇒
@@ -150,7 +173,7 @@ object MailRuCloud {
     }
   }
 
-  def csrfToken(session: Session): Future[CsrfToken] = {
+  def csrfToken(implicit session: Session): Future[CsrfToken] = {
     def extractHtmlPageId(response: HttpResponse): Future[String] = {
       val regex = "pageId: '(\\w+)'".r
       response.entity
@@ -170,8 +193,32 @@ object MailRuCloud {
       }
   }
 
-  def folder(path: String)(implicit session: Session, token: CsrfToken): Future[Folder] = {
-    execute[Folder](getRequest("folder", "home" → path))
+  def space(implicit session: Session, token: CsrfToken): Future[Space] = {
+    execute[Space](getRequest("user/space"))
+  }
+
+  def file(path: EntityPath)(implicit session: Session, token: CsrfToken): Future[File] = {
+    execute[File](getRequest("file", "home" → path.toString))
+  }
+
+  def folder(path: EntityPath)(implicit session: Session, token: CsrfToken): Future[Folder] = {
+    execute[Folder](getRequest("folder", "home" → path.toString))
+  }
+
+  def nodes(implicit session: Session, token: CsrfToken): Future[Nodes] = {
+    execute[Nodes](getRequest("dispatcher"))
+  }
+
+  def download(path: EntityPath)(implicit session: Session, token: CsrfToken): Source[ByteString, NotUsed] = {
+    Source.fromFuture(for (f ← file(path); n ← nodes) yield (f, n))
+      .map{ case (file, nodes) ⇒ (file, downloadRequest(nodes, path)) }
+      .flatMapConcat { case (file, request) ⇒ Source.fromFuture(http.singleRequest(request)).map(r ⇒ (file, r)) }
+      .flatMapConcat { case (file, response) ⇒ response.entity.withSizeLimit(file.size).dataBytes }
+  }
+
+  private def downloadRequest(nodes: Nodes, path: EntityPath)(implicit session: Session): HttpRequest = {
+    val (dlNode, _) = nodes.random
+    HttpRequest(HttpMethods.GET, dlNode + path.path.map(URLEncoder.encode(_, "UTF-8")).mkString("/"), Vector(session.header))
   }
 
   private def apiMethod(method: String) = {
@@ -211,14 +258,23 @@ object MailRuCloud {
 }
 
 object Main extends App {
-  implicit val session = Await.result(MailRuCloud.login(sys.props("mailru.login"), sys.props("mailru.password")), Duration.Inf)
+  implicit val session = Await.result(MailRuCloud.login(sys.props("mailru.email"), sys.props("mailru.password")), Duration.Inf)
   println(session)
 
-  implicit val token = Await.result(MailRuCloud.csrfToken(session), Duration.Inf)
+  implicit val token = Await.result(MailRuCloud.csrfToken, Duration.Inf)
   println(token)
+
+  val space = Await.result(MailRuCloud.space, Duration.Inf)
+  println(space)
+
+  val nodes = Await.result(MailRuCloud.nodes, Duration.Inf)
+  println(nodes)
+
+  val root = Await.result(MailRuCloud.folder(EntityPath.root), Duration.Inf)
+  println(root)
 
   Iterator.continually(StdIn.readLine())
     .takeWhile(null ne)
-    .map(folder ⇒ Await.result(MailRuCloud.folder(folder), Duration.Inf))
-    .foreach(println)
+    .map(file ⇒ MailRuCloud.download(file))
+    .foreach(_.runWith(FileIO.toPath(Paths.get("temp.jpg")))(MailRuCloud.actorMaterializer))
 }
