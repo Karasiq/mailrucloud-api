@@ -16,7 +16,7 @@ import upickle.Js
 import upickle.Js.Value
 import upickle.default._
 
-import scala.concurrent.duration.Duration
+import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.io.StdIn
 import scala.language.{implicitConversions, postfixOps}
@@ -25,7 +25,7 @@ import scala.util.Random
 object MailRuApiData {
   case class ApiResponse[T](email: String, body: T, time: Long, status: Int)
 
-  case class Space(@key("overquota") overused: Boolean, used: Int, total: Int) {
+  case class Space(overquota: Boolean, used: Int, total: Int) {
     override def toString: String = {
       def asGb(i: Int) = f"${i.toDouble / 1024}%.2f GB"
       s"[${asGb(used)} of ${asGb(total)} used]"
@@ -121,7 +121,9 @@ object MailRuCloud {
     { case Js.Str(str) ⇒ EntityPath(str) }
   )
 
-  private val CLOUD_MAIL_RU: Uri = "https://cloud.mail.ru/"
+  private val AUTH_URL = "https://auth.mail.ru/cgi-bin/auth"
+  private val AUTH_SDC_URL = "https://auth.mail.ru/sdc?from=https%3A%2F%2Fcloud.mail.ru%2F"
+  private val CLOUD_MAIL_RU = "https://cloud.mail.ru/"
 
   implicit val actorSystem = ActorSystem("mailrucloud-test")
   import actorSystem.dispatcher
@@ -136,16 +138,16 @@ object MailRuCloud {
       case Array(login) ⇒
         login → "mail.ru"
     }
-    val request = HttpRequest(HttpMethods.POST, "https://auth.mail.ru/cgi-bin/auth", entity = FormData(
+    val request = HttpRequest(HttpMethods.POST, AUTH_URL, entity = FormData(
       "new_auth_form" → "1",
-      "page" → "https://cloud.mail.ru/",
+      "page" → CLOUD_MAIL_RU,
       "Domain" → domain,
       "Login" → login,
       "Password" → password
     ).toEntity)
 
     http.singleRequest(request)
-      .filter(_.headers.exists(h ⇒ h.is("location") && h.value().startsWith("https://cloud.mail.ru/")))
+      .filter(_.headers.exists(h ⇒ h.is("location") && h.value().startsWith(CLOUD_MAIL_RU)))
       .map(response ⇒ Session(email, response.headers.collect { case `Set-Cookie`(cookie) ⇒ cookie }))
       .flatMap(addSdcToken)
   }
@@ -160,7 +162,7 @@ object MailRuCloud {
     def newSession(response: HttpResponse) = {
       extractSdc(response).fold(session)(cookie ⇒ session.copy(cookies = session.cookies :+ cookie))
     }
-    val request = HttpRequest(HttpMethods.GET, "https://auth.mail.ru/sdc?from=https%3A%2F%2Fcloud.mail.ru%2F", Vector(session.header))
+    val request = HttpRequest(HttpMethods.GET, AUTH_SDC_URL, Vector(session.header))
     http.singleRequest(request).flatMap { response ⇒
       val location = extractLocation(response)
       extractSdc(response) match {
@@ -194,26 +196,52 @@ object MailRuCloud {
   }
 
   def space(implicit session: Session, token: CsrfToken): Future[Space] = {
-    execute[Space](getRequest("user/space"))
+    get[Space]("user/space")
   }
 
   def file(path: EntityPath)(implicit session: Session, token: CsrfToken): Future[File] = {
-    execute[File](getRequest("file", "home" → path.toString))
+    get[File]("file", "home" → path.toString)
   }
 
   def folder(path: EntityPath)(implicit session: Session, token: CsrfToken): Future[Folder] = {
-    execute[Folder](getRequest("folder", "home" → path.toString))
+    get[Folder]("folder", "home" → path.toString)
   }
 
   def nodes(implicit session: Session, token: CsrfToken): Future[Nodes] = {
-    execute[Nodes](getRequest("dispatcher"))
+    get[Nodes]("dispatcher")
+  }
+
+  def delete(path: EntityPath)(implicit session: Session, token: CsrfToken): Future[String] = {
+    post[String]("file/remove", "home" → path.toString)
   }
 
   def download(path: EntityPath)(implicit session: Session, token: CsrfToken): Source[ByteString, NotUsed] = {
     Source.fromFuture(for (f ← file(path); n ← nodes) yield (f, n))
-      .map{ case (file, nodes) ⇒ (file, downloadRequest(nodes, path)) }
+      .map { case (file, nodes) ⇒ (file, downloadRequest(nodes, path)) }
       .flatMapConcat { case (file, request) ⇒ Source.fromFuture(http.singleRequest(request)).map(r ⇒ (file, r)) }
       .flatMapConcat { case (file, response) ⇒ response.entity.withSizeLimit(file.size).dataBytes }
+  }
+
+  def upload(path: EntityPath, data: Source[ByteString, _])(implicit session: Session, token: CsrfToken): Future[String] = {
+    nodes
+      .flatMap(uploadRequest(_, path, data))
+      .flatMap(http.singleRequest(_))
+      .flatMap(_.entity.withSizeLimit(1000).dataBytes.runFold(ByteString.empty)(_ ++ _))
+      .map { bs ⇒
+        val regex = "(\\w+);(\\d+)".r.unanchored
+        bs.utf8String match {
+          case regex(hash, size) ⇒
+            hash → size
+
+          case _ ⇒
+            throw new IllegalArgumentException("Invalid response")
+        }
+      }
+      .flatMap { case (hash, size) ⇒ post[String]("file/add", "home" → path.toString, "hash" → hash, "size" → size) }
+  }
+
+  def createFolder(path: EntityPath)(implicit session: Session, token: CsrfToken): Future[String] = {
+    post[String]("folder/add", "home" → path.toString)
   }
 
   private def downloadRequest(nodes: Nodes, path: EntityPath)(implicit session: Session): HttpRequest = {
@@ -221,8 +249,25 @@ object MailRuCloud {
     HttpRequest(HttpMethods.GET, dlNode + path.path.map(URLEncoder.encode(_, "UTF-8")).mkString("/"), Vector(session.header))
   }
 
+  private def uploadRequest(nodes: Nodes, path: EntityPath, data: Source[ByteString, _])(implicit session: Session): Future[HttpRequest] = {
+    val (_, ulNode) = nodes.random
+    val fileName = path.path.last
+    val formData = Multipart.FormData(Multipart.FormData.BodyPart("file", HttpEntity.IndefiniteLength(ContentTypes.`application/octet-stream`, data), Map("filename" → fileName)))
+    val url = ulNode + path.path.dropRight(1).map(URLEncoder.encode(_, "UTF-8")).mkString("/")
+    formData.toStrict(10 seconds)
+      .map(data ⇒ HttpRequest(HttpMethods.POST, url, Vector(session.header), data.toEntity()))
+  }
+
   private def apiMethod(method: String) = {
-    CLOUD_MAIL_RU.withPath(Uri.Path("/api/v2/" + method))
+    Uri(CLOUD_MAIL_RU).withPath(Uri.Path("/api/v2/" + method))
+  }
+
+  def get[T: Reader](method: String, data: (String, String)*)(implicit session: Session, csrfToken: CsrfToken): Future[T] = {
+    execute[T](getRequest(method, data:_*))
+  }
+
+  def post[T: Reader](method: String, data: (String, String)*)(implicit session: Session, csrfToken: CsrfToken): Future[T] = {
+    execute[T](postRequest(method, data:_*))
   }
 
   private def execute[T: Reader](request: HttpRequest): Future[T] = {
@@ -273,8 +318,19 @@ object Main extends App {
   val root = Await.result(MailRuCloud.folder(EntityPath.root), Duration.Inf)
   println(root)
 
+  private val testJpg = Paths.get("temp.jpg")
+
+  val folderResult = Await.result(MailRuCloud.createFolder("Testfolder"), Duration.Inf)
+  println(folderResult)
+
+  val deleteResult = Await.result(MailRuCloud.delete("test.jpg"), Duration.Inf)
+  println(deleteResult)
+
+  val uploadResult = Await.result(MailRuCloud.upload("test.jpg", FileIO.fromPath(testJpg)), Duration.Inf)
+  println(uploadResult)
+
   Iterator.continually(StdIn.readLine())
     .takeWhile(null ne)
     .map(file ⇒ MailRuCloud.download(file))
-    .foreach(_.runWith(FileIO.toPath(Paths.get("temp.jpg")))(MailRuCloud.actorMaterializer))
+    .foreach(_.runWith(FileIO.toPath(testJpg))(MailRuCloud.actorMaterializer))
 }
