@@ -14,10 +14,11 @@ resolvers += Resolver.sonatypeRepo("snapshots")
 
 libraryDependencies ++= {
   val akkaV = "2.4.16"
+  val akkaHttpV = "10.0.1"
   Seq(
     "com.typesafe.akka" %% "akka-actor" % akkaV,
     "com.typesafe.akka" %% "akka-stream" % akkaV,
-    "com.typesafe.akka" %% "akka-http" % "10.0.1",
+    "com.typesafe.akka" %% "akka-http" % akkaHttpV,
     "com.lihaoyi" %% "upickle" % "0.4.3"
   )                       
 }
