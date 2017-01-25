@@ -6,7 +6,7 @@ version := "1.0.0-SNAPSHOT"
 
 isSnapshot := version.value.endsWith("SNAPSHOT")
 
-scalaVersion := "2.11.8"
+scalaVersion := "2.12.1"
 
 resolvers += "softprops-maven" at "http://dl.bintray.com/content/softprops/maven"
 
@@ -19,11 +19,9 @@ libraryDependencies ++= {
     "com.typesafe.akka" %% "akka-actor" % akkaV,
     "com.typesafe.akka" %% "akka-stream" % akkaV,
     "com.typesafe.akka" %% "akka-http" % akkaHttpV,
-    "com.lihaoyi" %% "upickle" % "0.4.3"
+    "com.lihaoyi" %% "upickle" % "0.4.4"
   )                       
 }
-
-scalacOptions ++= Seq("-optimize", "-deprecation", "-feature")
 
 mainClass in Compile := Some("com.karasiq.mailrucloud.test.Main")
 
