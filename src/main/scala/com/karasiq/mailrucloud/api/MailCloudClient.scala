@@ -16,7 +16,7 @@ trait MailCloudClient {
   import api._
 
   def login(email: String, password: String): Future[Session] = {
-    http.singleRequest(loginRequest(email, password))
+    doHttpRequest(loginRequest(email, password))
       .filter(_.headers.exists(h ⇒ h.is("location") && h.value().startsWith(BASE_DOMAIN)))
       .map(response ⇒ Session(email, response.headers.collect { case `Set-Cookie`(cookie) ⇒ cookie }))
       .flatMap(addSdcToken)
@@ -33,11 +33,11 @@ trait MailCloudClient {
       extractSdc(response).fold(session)(cookie ⇒ session.copy(cookies = session.cookies :+ cookie))
     }
     val request = sdcRequest(session)
-    http.singleRequest(request).flatMap { response ⇒
+    doHttpRequest(request).flatMap { response ⇒
       val location = extractLocation(response)
       extractSdc(response) match {
         case None if location.nonEmpty ⇒ // Redirect
-          http.singleRequest(request.copy(uri = location.get)).map(newSession)
+          doHttpRequest(request.copy(uri = location.get)).map(newSession)
 
         case _ ⇒
           Future.successful(newSession(response))
@@ -54,7 +54,7 @@ trait MailCloudClient {
         .mapConcat(bs ⇒ regex.findFirstMatchIn(bs.utf8String).map(_.group(1)).toList)
         .runWith(Sink.head)
     }
-    http.singleRequest(cloudHomeRequest)
+    doHttpRequest(cloudHomeRequest)
       .flatMap(extractHtmlPageId)
       .flatMap { pageId ⇒
         executeApiRequest[ApiCsrfToken](csrfTokenRequest(pageId))
@@ -85,14 +85,14 @@ trait MailCloudClient {
   def download(path: EntityPath)(implicit session: Session, token: CsrfToken): Source[ByteString, NotUsed] = {
     Source.fromFuture(for (f ← file(path); n ← nodes) yield (f, n))
       .map { case (file, nodes) ⇒ (file, downloadRequest(nodes, path)) }
-      .flatMapConcat { case (file, request) ⇒ Source.fromFuture(http.singleRequest(request)).map(r ⇒ (file, r)) }
+      .flatMapConcat { case (file, request) ⇒ Source.fromFuture(doHttpRequest(request)).map(r ⇒ (file, r)) }
       .flatMapConcat { case (file, response) ⇒ response.entity.withSizeLimit(file.size).dataBytes }
   }
 
   def upload(path: EntityPath, data: Source[ByteString, _])(implicit session: Session, token: CsrfToken): Future[EntityPath] = {
     nodes
       .flatMap(uploadRequest(_, path, data))
-      .flatMap(http.singleRequest(_))
+      .flatMap(doHttpRequest)
       .flatMap(_.entity.withSizeLimit(1000).dataBytes.runFold(ByteString.empty)(_ ++ _))
       .map { bs ⇒
         val regex = "(\\w+);(\\d+)".r.unanchored

@@ -22,7 +22,7 @@ trait MailCloudApi { self: MailCloudConstants with MailCloudForms with MailCloud
   }
 
   def executeApiRequest[T: Reader](request: HttpRequest): Future[T] = {
-    http.singleRequest(request)
+    doHttpRequest(request)
       .flatMap(_.entity.dataBytes.runFold(ByteString.empty)(_ ++ _))
       .map { bs ⇒
         val response = read[ApiResponse[T]](bs.utf8String)
@@ -38,7 +38,11 @@ object MailCloudApi {
     final implicit val actorSystem = as
     final implicit val actorMaterializer = ActorMaterializer()
     final implicit val executionContext = actorSystem.dispatcher
-    final implicit val http = Http()
+    final val akkaHttp = Http()
+
+    def doHttpRequest(request: HttpRequest) = {
+      akkaHttp.singleRequest(request)
+    }
   }
 
   def apply()(implicit as: ActorSystem): DefaultMailCloudApi = new DefaultMailCloudApi(as)
