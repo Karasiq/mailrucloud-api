@@ -5,6 +5,7 @@ import java.net.URLEncoder
 
 import akka.http.scaladsl.model.HttpRequest
 import akka.http.scaladsl.model.headers.{Cookie, HttpCookie}
+import akka.util.ByteString
 import derive.key
 
 import scala.language.{implicitConversions, postfixOps}
@@ -12,7 +13,7 @@ import scala.util.Random
 
 object MailCloudTypes {
   case class ApiResponse[T](email: String, body: T, time: Long, status: Int)
-  case class ApiException(request: HttpRequest, response: ApiResponse[upickle.Js.Obj], errorName: Option[String], cause: Throwable = null) extends IOException(s"Cloud.Mail.Ru API request failed: ${request.uri} (${errorName.getOrElse(response)})", cause)
+  case class ApiException(request: HttpRequest, response: ByteString, errorName: Option[String], cause: Throwable = null) extends IOException(s"Cloud.Mail.Ru API request failed: ${request.uri} (${errorName.getOrElse(response.utf8String)})", cause)
 
   case class Space(overquota: Boolean, used: Int, total: Int) {
     override def toString: String = {

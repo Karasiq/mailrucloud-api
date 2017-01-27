@@ -6,14 +6,32 @@ import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.model.headers.{Location, `Set-Cookie`}
 import akka.stream.scaladsl.{Sink, Source}
 import akka.util.ByteString
+import com.karasiq.mailrucloud.api.MailCloudTypes._
 
 import scala.concurrent.Future
 import scala.language.postfixOps
 
 trait MailCloudClient {
-  val api: MailCloudApi.DefaultMailCloudApiTrait
-  import MailCloudTypes._
+  val api: MailCloudApi.MailCloudApiLike
+  implicit val context: MailCloudContext
+
+  def login(email: String, password: String): Future[Session]
+  def csrfToken(implicit session: Session): Future[CsrfToken]
+  def space(implicit session: Session, token: CsrfToken): Future[Space]
+  def file(path: EntityPath)(implicit session: Session, token: CsrfToken): Future[File]
+  def folder(path: EntityPath)(implicit session: Session, token: CsrfToken): Future[Folder]
+  def nodes(implicit session: Session, token: CsrfToken): Future[Nodes]
+  def delete(path: EntityPath)(implicit session: Session, token: CsrfToken): Future[EntityPath]
+  def download(path: EntityPath)(implicit session: Session, token: CsrfToken): Source[ByteString, NotUsed]
+  def upload(path: EntityPath, data: Source[ByteString, _])(implicit session: Session, token: CsrfToken): Future[EntityPath]
+  def createFolder(path: EntityPath)(implicit session: Session, token: CsrfToken): Future[EntityPath]
+}
+
+trait MailCloudJsonClient extends MailCloudClient {
+  val api: MailCloudApi.MailCloudApiLike with MailCloudJsonApi
+  implicit val context: MailCloudContext
   import api._
+  import context._
 
   def login(email: String, password: String): Future[Session] = {
     doHttpRequest(loginRequest(email, password))
@@ -84,8 +102,8 @@ trait MailCloudClient {
 
   def download(path: EntityPath)(implicit session: Session, token: CsrfToken): Source[ByteString, NotUsed] = {
     Source.fromFuture(for (f ← file(path); n ← nodes) yield (f, n))
-      .map { case (file, nodes) ⇒ (file, downloadRequest(nodes, path)) }
-      .flatMapConcat { case (file, request) ⇒ Source.fromFuture(doHttpRequest(request)).map(r ⇒ (file, r)) }
+      .mapAsync(1) { case (file, nodes) ⇒ downloadRequest(nodes, path).map((file, _)) }
+      .mapAsync(1) { case (file, request) ⇒ doHttpRequest(request).map((file, _)) }
       .flatMapConcat { case (file, response) ⇒ response.entity.withSizeLimit(file.size).dataBytes }
   }
 
@@ -110,12 +128,15 @@ trait MailCloudClient {
   def createFolder(path: EntityPath)(implicit session: Session, token: CsrfToken): Future[EntityPath] = {
     post[EntityPath]("folder/add", "home" → path.toString)
   }
+
+  // TODO: Missing methods
 }
 
 object MailCloudClient {
-  class DefaultMailCloudClient(as: ActorSystem) extends MailCloudClient {
-    final val api = MailCloudApi()(as)
+  final class DefaultMailCloudClient(implicit as: ActorSystem) extends MailCloudJsonClient {
+    val api = MailCloudApi()
+    val context = MailCloudContext()
   }
 
-  def apply()(implicit as: ActorSystem): DefaultMailCloudClient = new DefaultMailCloudClient(as)
+  def apply()(implicit as: ActorSystem): DefaultMailCloudClient = new DefaultMailCloudClient
 }

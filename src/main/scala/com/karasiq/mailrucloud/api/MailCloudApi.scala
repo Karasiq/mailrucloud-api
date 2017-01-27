@@ -1,55 +1,52 @@
 package com.karasiq.mailrucloud.api
 
 import akka.actor.ActorSystem
-import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.HttpRequest
-import akka.stream.ActorMaterializer
 import akka.util.ByteString
+import com.karasiq.mailrucloud.api.MailCloudTypes.{CsrfToken, Session}
 
 import scala.concurrent.Future
-import scala.language.postfixOps
+import scala.language.{higherKinds, postfixOps}
 import scala.util.Try
 
-trait MailCloudApi { self: MailCloudConstants with MailCloudForms with MailCloudUrls with MailCloudRequests with MailCloudJson with MailCloudContext ⇒
-  import MailCloudTypes._
+trait MailCloudApi { self: MailCloudRequests ⇒
+  type ResponseParser[T]
+  def executeApiRequest[T: ResponseParser](request: HttpRequest)(implicit ctx: MailCloudContext): Future[T]
 
-  def get[T: Reader](method: String, data: (String, String)*)(implicit session: Session, csrfToken: CsrfToken): Future[T] = {
+  def get[T: ResponseParser](method: String, data: (String, String)*)(implicit ctx: MailCloudContext, session: Session, csrfToken: CsrfToken): Future[T] = {
     executeApiRequest[T](getRequest(method, data:_*))
   }
 
-  def post[T: Reader](method: String, data: (String, String)*)(implicit session: Session, csrfToken: CsrfToken): Future[T] = {
+  def post[T: ResponseParser](method: String, data: (String, String)*)(implicit ctx: MailCloudContext, session: Session, csrfToken: CsrfToken): Future[T] = {
     executeApiRequest[T](postRequest(method, data:_*))
   }
+}
 
-  private def extractError(response: ApiResponse[upickle.Js.Obj]): Option[String] = {
-    Try(response.body("home")("error").str).toOption
-  }
+trait MailCloudJsonApi extends MailCloudApi with MailCloudJson { self: MailCloudConstants with MailCloudForms with MailCloudUrls with MailCloudRequests ⇒
+  import MailCloudTypes._
 
-  def executeApiRequest[T: Reader](request: HttpRequest): Future[T] = {
+  override type ResponseParser[T] = Reader[T]
+
+  def executeApiRequest[T: ResponseParser](request: HttpRequest)(implicit ctx: MailCloudContext): Future[T] = {
+    import ctx._
     doHttpRequest(request)
       .flatMap(_.entity.dataBytes.runFold(ByteString.empty)(_ ++ _))
       .map { bs ⇒
         val responseStr = bs.utf8String
-        val response = read[ApiResponse[upickle.Js.Obj]](responseStr)
-        if (response.status != 200)
-          throw ApiException(request, response, extractError(response))
+        val response = read[ApiResponse[upickle.Js.Value]](responseStr)
+        if (response.status != 200) {
+          val errorStr = Try(response.body.obj("home")("error").str).toOption
+          throw ApiException(request, bs, errorStr)
+        }
         readJs[T](response.body)
       }
   }
 }
 
 object MailCloudApi {
-  trait DefaultMailCloudApiTrait extends MailCloudApi with MailCloudConstants with MailCloudForms with MailCloudUrls with MailCloudRequests with MailCloudJson with MailCloudContext
-  class DefaultMailCloudApi(as: ActorSystem) extends DefaultMailCloudApiTrait {
-    final implicit val actorSystem = as
-    final implicit val actorMaterializer = ActorMaterializer()
-    final implicit val executionContext = actorSystem.dispatcher
-    final val akkaHttp = Http()
+  trait MailCloudApiLike extends MailCloudApi with MailCloudConstants with MailCloudForms with MailCloudUrls with MailCloudRequests
+  trait DefaultMailCloudApiLike extends MailCloudApiLike with MailCloudJsonApi with DefaultMailCloudConstants with DefaultMailCloudUrls with DefaultMailCloudForms with DefaultMailCloudRequests
+  final class DefaultMailCloudApi extends DefaultMailCloudApiLike
 
-    def doHttpRequest(request: HttpRequest) = {
-      akkaHttp.singleRequest(request)
-    }
-  }
-
-  def apply()(implicit as: ActorSystem): DefaultMailCloudApi = new DefaultMailCloudApi(as)
+  def apply()(implicit as: ActorSystem): DefaultMailCloudApi = new DefaultMailCloudApi
 }
