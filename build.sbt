@@ -8,6 +8,8 @@ isSnapshot := version.value.endsWith("SNAPSHOT")
 
 scalaVersion := "2.12.1"
 
+crossScalaVersions := Seq("2.11.8", "2.12.1")
+
 resolvers += "softprops-maven" at "http://dl.bintray.com/content/softprops/maven"
 
 resolvers += Resolver.sonatypeRepo("snapshots")

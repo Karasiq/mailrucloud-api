@@ -8,8 +8,8 @@ import akka.util.ByteString
 
 import scala.concurrent.Future
 import scala.language.postfixOps
+import scala.util.Try
 
-// TODO: Error handling
 trait MailCloudApi { self: MailCloudConstants with MailCloudForms with MailCloudUrls with MailCloudRequests with MailCloudJson with MailCloudContext ⇒
   import MailCloudTypes._
 
@@ -21,13 +21,19 @@ trait MailCloudApi { self: MailCloudConstants with MailCloudForms with MailCloud
     executeApiRequest[T](postRequest(method, data:_*))
   }
 
+  private def extractError(response: ApiResponse[upickle.Js.Obj]): Option[String] = {
+    Try(response.body("home")("error").str).toOption
+  }
+
   def executeApiRequest[T: Reader](request: HttpRequest): Future[T] = {
     doHttpRequest(request)
       .flatMap(_.entity.dataBytes.runFold(ByteString.empty)(_ ++ _))
       .map { bs ⇒
-        val response = read[ApiResponse[T]](bs.utf8String)
-        if (response.status != 200) throw new IllegalArgumentException(s"API request failed: $request ($response)")
-        response.body
+        val responseStr = bs.utf8String
+        val response = read[ApiResponse[upickle.Js.Obj]](responseStr)
+        if (response.status != 200)
+          throw ApiException(request, response, extractError(response))
+        readJs[T](response.body)
       }
   }
 }

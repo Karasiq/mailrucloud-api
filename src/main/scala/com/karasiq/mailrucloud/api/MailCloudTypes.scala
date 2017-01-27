@@ -1,7 +1,9 @@
 package com.karasiq.mailrucloud.api
 
+import java.io.IOException
 import java.net.URLEncoder
 
+import akka.http.scaladsl.model.HttpRequest
 import akka.http.scaladsl.model.headers.{Cookie, HttpCookie}
 import derive.key
 
@@ -10,6 +12,7 @@ import scala.util.Random
 
 object MailCloudTypes {
   case class ApiResponse[T](email: String, body: T, time: Long, status: Int)
+  case class ApiException(request: HttpRequest, response: ApiResponse[upickle.Js.Obj], errorName: Option[String], cause: Throwable = null) extends IOException(s"Cloud.Mail.Ru API request failed: ${request.uri} (${errorName.getOrElse(response)})", cause)
 
   case class Space(overquota: Boolean, used: Int, total: Int) {
     override def toString: String = {
