@@ -1,8 +1,8 @@
 package com.karasiq.mailrucloud.api
 
 import akka.http.scaladsl.model._
-import akka.util.ByteString
 import com.karasiq.mailrucloud.api.MailCloudTypes.{CsrfToken, Session}
+import com.karasiq.mailrucloud.utils.MailCloudUtils
 
 import scala.language.postfixOps
 
@@ -10,7 +10,7 @@ trait MailCloudForms {
   def loginForm(email: String, password: String): FormData
   def apiRequestQuery(session: Session, data: (String, String)*): FormData
   def apiRequestQuery(session: Session, token: CsrfToken, data: (String, String)*): FormData
-  def uploadRequestEntity(fileName: String, entity: BodyPartEntity): Multipart.FormData
+  def uploadRequestEntity(fileName: String, entity: HttpEntity.Default): RequestEntity
 }
 
 trait DefaultMailCloudForms extends MailCloudForms { self: MailCloudConstants with MailCloudUrls ⇒
@@ -47,10 +47,7 @@ trait DefaultMailCloudForms extends MailCloudForms { self: MailCloudConstants wi
     apiRequestQuery(session, Seq("x-page-id" → token.pageId, "token" → token.token) ++ data:_*)
   }
 
-  override def uploadRequestEntity(fileName: String, entity: BodyPartEntity): Multipart.FormData = {
-    Multipart.FormData(
-      Multipart.FormData.BodyPart("file", entity, Map("filename" → fileName)),
-      Multipart.FormData.BodyPart.Strict("_file", HttpEntity.Strict(ContentTypes.`text/plain(UTF-8)`, ByteString(fileName)))
-    )
+  override def uploadRequestEntity(fileName: String, entity: HttpEntity.Default): RequestEntity = {
+    MailCloudUtils.instantSizedMultipartUpload(fileName, entity)
   }
 }

@@ -1,8 +1,9 @@
 package com.karasiq.mailrucloud.test
 
-import java.nio.file.{Files, Paths}
+import java.nio.file.{Files, Paths, StandardOpenOption}
 
 import akka.actor.ActorSystem
+import akka.http.scaladsl.model.{ContentType, HttpEntity, MediaTypes}
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.FileIO
 import com.karasiq.mailrucloud.api.MailCloudClient
@@ -29,7 +30,7 @@ object Main extends App {
   val space = Await.result(cloud.space, Duration.Inf)
   println(space)
 
-  val nodes = Await.result(cloud.nodes, Duration.Inf)
+  implicit val nodes = Await.result(cloud.nodes, Duration.Inf)
   println(nodes)
 
   val listing = Await.result(cloud.folder(cloud.api.ROOT_FOLDER), Duration.Inf)
@@ -38,15 +39,18 @@ object Main extends App {
   val folderResult = Await.result(for (_ ← cloud.delete("Testfolder"); r ← cloud.createFolder("Testfolder")) yield r, Duration.Inf)
   println(folderResult)
 
-  val deleteResult = Await.result(cloud.delete("test.jpg"), Duration.Inf)
-  println(deleteResult)
+  val testJpg = "test.jpg"
+  val deleteResult = Await.result(cloud.delete(testJpg), Duration.Inf)
+  println(s"DELETED: $deleteResult")
 
-  if (Files.exists(Paths.get("test.jpg"))) {
-    val uploadResult = Await.result(cloud.upload("test.jpg", FileIO.fromPath(Paths.get("test.jpg"))), Duration.Inf)
-    println(uploadResult)
+  val localTestJpg = Paths.get(testJpg)
+  if (Files.exists(localTestJpg)) {
+    val uploadResult = Await.result(cloud.upload(testJpg, HttpEntity.Default(ContentType(MediaTypes.`image/jpeg`), Files.size(localTestJpg), FileIO.fromPath(localTestJpg))), Duration.Inf)
+    println(s"UPLOADED: $uploadResult")
   }
 
   Iterator.continually(StdIn.readLine())
     .takeWhile(null ne)
-    .foreach(file ⇒ cloud.download(file).runWith(FileIO.toPath(Paths.get(EntityPath(file).name))))
+    .foreach(file ⇒ cloud.download(file)
+      .runWith(FileIO.toPath(Paths.get(EntityPath(file).name), Set(StandardOpenOption.WRITE, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING))))
 }

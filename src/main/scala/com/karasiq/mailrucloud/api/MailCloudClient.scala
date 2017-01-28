@@ -2,8 +2,8 @@ package com.karasiq.mailrucloud.api
 
 import akka.NotUsed
 import akka.actor.ActorSystem
-import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.model.headers.{Location, `Set-Cookie`}
+import akka.http.scaladsl.model.{HttpEntity, HttpResponse}
 import akka.stream.scaladsl.{Sink, Source}
 import akka.util.ByteString
 import com.karasiq.mailrucloud.api.MailCloudTypes._
@@ -22,8 +22,8 @@ trait MailCloudClient {
   def folder(path: EntityPath)(implicit session: Session, token: CsrfToken): Future[Folder]
   def nodes(implicit session: Session, token: CsrfToken): Future[Nodes]
   def delete(path: EntityPath)(implicit session: Session, token: CsrfToken): Future[EntityPath]
-  def download(path: EntityPath)(implicit session: Session, token: CsrfToken): Source[ByteString, NotUsed]
-  def upload(path: EntityPath, data: Source[ByteString, _])(implicit session: Session, token: CsrfToken): Future[EntityPath]
+  def download(path: EntityPath)(implicit nodes: Nodes, session: Session, token: CsrfToken): Source[ByteString, NotUsed]
+  def upload(path: EntityPath, data: HttpEntity.Default)(implicit nodes: Nodes, session: Session, token: CsrfToken): Future[EntityPath]
   def createFolder(path: EntityPath)(implicit session: Session, token: CsrfToken): Future[EntityPath]
 }
 
@@ -100,17 +100,15 @@ trait MailCloudJsonClient extends MailCloudClient {
     post[EntityPath]("file/remove", "home" → path.toString)
   }
 
-  def download(path: EntityPath)(implicit session: Session, token: CsrfToken): Source[ByteString, NotUsed] = {
-    Source.fromFuture(for (f ← file(path); n ← nodes) yield (f, n))
-      .mapAsync(1) { case (file, nodes) ⇒ downloadRequest(nodes, path).map((file, _)) }
+  def download(path: EntityPath)(implicit nodes: Nodes, session: Session, token: CsrfToken): Source[ByteString, NotUsed] = {
+    Source.fromFuture(file(path))
+      .map((_, downloadRequest(path)))
       .mapAsync(1) { case (file, request) ⇒ doHttpRequest(request).map((file, _)) }
       .flatMapConcat { case (file, response) ⇒ response.entity.withSizeLimit(file.size).dataBytes }
   }
 
-  def upload(path: EntityPath, data: Source[ByteString, _])(implicit session: Session, token: CsrfToken): Future[EntityPath] = {
-    nodes
-      .flatMap(uploadRequest(_, path, data))
-      .flatMap(doHttpRequest)
+  def upload(path: EntityPath, data: HttpEntity.Default)(implicit nodes: Nodes, session: Session, token: CsrfToken): Future[EntityPath] = {
+    doHttpRequest(uploadRequest(path, data))
       .flatMap(_.entity.withSizeLimit(1000).dataBytes.runFold(ByteString.empty)(_ ++ _))
       .map { bs ⇒
         val regex = "(\\w+);(\\d+)".r.unanchored
