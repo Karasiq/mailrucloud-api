@@ -4,7 +4,6 @@ import java.nio.file.{Files, Paths, StandardOpenOption}
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.model.{ContentType, HttpEntity, MediaTypes}
-import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.FileIO
 import com.karasiq.mailrucloud.api.MailCloudClient
 import com.karasiq.mailrucloud.api.MailCloudTypes.EntityPath
@@ -17,9 +16,8 @@ import scala.language.{implicitConversions, postfixOps}
 // Test application
 object Main extends App {
   implicit val actorSystem = ActorSystem("mailcloud-test")
-  implicit val actorMaterializer = ActorMaterializer()
-  import actorSystem.dispatcher
   val cloud = MailCloudClient()
+  import cloud.context._
 
   implicit val session = Await.result(cloud.login(sys.props("mailru.email"), sys.props("mailru.password")), Duration.Inf)
   println(session)
