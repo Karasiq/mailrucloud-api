@@ -117,7 +117,11 @@ trait MailCloudJsonClient extends MailCloudClient {
                                (implicit nodes: Nodes, session: Session, token: CsrfToken) = {
     result
       .flatMap(_.entity.withSizeLimit(1000).dataBytes.runFold(ByteString.empty)(_ ++ _))
-      .map(_.utf8String)
+      .map { bs ⇒
+        val hash = bs.utf8String
+        require(hash.matches("[a-fA-F0-9]{40}"), "Invalid hash: " + hash)
+        hash 
+      }
       .flatMap(hash ⇒ post[EntityPath]("file/add", "home" → path.toString, "hash" → hash, "size" → size.toString))
   }
 
