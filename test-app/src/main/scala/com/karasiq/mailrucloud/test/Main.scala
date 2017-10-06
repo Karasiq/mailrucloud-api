@@ -32,17 +32,17 @@ object Main extends App {
   implicit val nodes = Await.result(cloud.nodes, Duration.Inf)
   println(nodes)
 
-  val listing = Await.result(cloud.folder(cloud.api.ROOT_FOLDER), Duration.Inf)
+  val listing = Await.result(cloud.folder(cloud.api.RootFolder), Duration.Inf)
   println(listing)
 
   val folderResult = Await.result(for (_ ← cloud.delete("Testfolder"); r ← cloud.createFolder("Testfolder")) yield r, Duration.Inf)
   println(folderResult)
 
-  val testJpg = "test.jpg"
+  val testJpg = "Testfolder/test.jpg"
   val deleteResult = Await.result(cloud.delete(testJpg), Duration.Inf)
   println(s"DELETED: $deleteResult")
 
-  val localTestJpg = Paths.get(testJpg)
+  val localTestJpg = Paths.get("test.jpg")
   if (Files.exists(localTestJpg)) {
     val uploadResult = Await.result(cloud.upload(testJpg, HttpEntity.Default(ContentType(MediaTypes.`image/jpeg`), Files.size(localTestJpg), FileIO.fromPath(localTestJpg))), Duration.Inf)
     println(s"UPLOADED: $uploadResult")

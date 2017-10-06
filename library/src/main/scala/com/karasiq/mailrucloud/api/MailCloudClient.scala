@@ -5,7 +5,7 @@ import scala.language.postfixOps
 
 import akka.NotUsed
 import akka.actor.ActorSystem
-import akka.http.scaladsl.model.{HttpEntity, HttpResponse}
+import akka.http.scaladsl.model.{HttpResponse, RequestEntity}
 import akka.http.scaladsl.model.headers.{`Set-Cookie`, Location}
 import akka.stream.scaladsl.{Sink, Source}
 import akka.util.ByteString
@@ -24,7 +24,7 @@ trait MailCloudClient {
   def nodes(implicit session: Session, token: CsrfToken): Future[Nodes]
   def delete(path: EntityPath)(implicit session: Session, token: CsrfToken): Future[EntityPath]
   def download(path: EntityPath)(implicit nodes: Nodes, session: Session, token: CsrfToken): Source[ByteString, NotUsed]
-  def upload(path: EntityPath, data: HttpEntity.Default)(implicit nodes: Nodes, session: Session, token: CsrfToken): Future[EntityPath]
+  def upload(path: EntityPath, data: RequestEntity)(implicit nodes: Nodes, session: Session, token: CsrfToken): Future[EntityPath]
   def createFolder(path: EntityPath)(implicit session: Session, token: CsrfToken): Future[EntityPath]
 }
 
@@ -108,20 +108,17 @@ trait MailCloudJsonClient extends MailCloudClient {
       .flatMapConcat { case (file, response) ⇒ response.entity.withSizeLimit(file.size).dataBytes }
   }
 
-  def upload(path: EntityPath, data: HttpEntity.Default)(implicit nodes: Nodes, session: Session, token: CsrfToken): Future[EntityPath] = {
-    doHttpRequest(uploadRequest(path, data))
-      .flatMap(_.entity.withSizeLimit(1000).dataBytes.runFold(ByteString.empty)(_ ++ _))
-      .map { bs ⇒
-        val regex = "(\\w+);(\\d+)".r.unanchored
-        bs.utf8String match {
-          case regex(hash, size) ⇒
-            hash → size
+  override def upload(path: EntityPath, data: RequestEntity)(implicit nodes: Nodes, session: Session, token: CsrfToken): Future[EntityPath] = {
+    val future = doHttpRequest(uploadRequest(path, data))
+    parseUploadResult(path, data.contentLengthOption.getOrElse(throw new IllegalArgumentException("Content length required")), future)
+  }
 
-          case _ ⇒
-            throw new IllegalArgumentException("Invalid response")
-        }
-      }
-      .flatMap { case (hash, size) ⇒ post[EntityPath]("file/add", "home" → path.toString, "hash" → hash, "size" → size) }
+  private def parseUploadResult(path: EntityPath, size: Long, result: Future[HttpResponse])
+                               (implicit nodes: Nodes, session: Session, token: CsrfToken) = {
+    result
+      .flatMap(_.entity.withSizeLimit(1000).dataBytes.runFold(ByteString.empty)(_ ++ _))
+      .map(_.utf8String)
+      .flatMap(hash ⇒ post[EntityPath]("file/add", "home" → path.toString, "hash" → hash, "size" → size.toString))
   }
 
   def createFolder(path: EntityPath)(implicit session: Session, token: CsrfToken): Future[EntityPath] = {

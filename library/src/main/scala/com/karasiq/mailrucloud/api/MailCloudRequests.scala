@@ -10,7 +10,7 @@ trait MailCloudRequests {
   def getRequest(method: String, data: (String, String)*)(implicit session: Session, token: CsrfToken): HttpRequest
   def postRequest(method: String, data: (String, String)*)(implicit session: Session, token: CsrfToken): HttpRequest
   def downloadRequest(path: EntityPath)(implicit nodes: Nodes, session: Session): HttpRequest
-  def uploadRequest(path: EntityPath, data: HttpEntity.Default)(implicit nodes: Nodes, session: Session): HttpRequest
+  def uploadRequest(path: EntityPath, data: RequestEntity)(implicit nodes: Nodes, session: Session): HttpRequest
   def loginRequest(email: String, password: String): HttpRequest
   def sdcRequest(implicit session: Session): HttpRequest
   def cloudHomeRequest(implicit session: Session): HttpRequest
@@ -35,12 +35,11 @@ trait DefaultMailCloudRequests extends MailCloudRequests { self: MailCloudConsta
 
   private def emptyUploadRequest(path: EntityPath)(implicit nodes: Nodes, session: Session): HttpRequest = {
     val (_, ulNode) = nodes.random
-    HttpRequest(HttpMethods.POST, ulNode + path.parent.toURLPath, Vector(session.header))
+    HttpRequest(HttpMethods.PUT, ulNode, Vector(session.header))
   }
 
-  override def uploadRequest(path: EntityPath, data: HttpEntity.Default)(implicit nodes: Nodes, session: Session): HttpRequest = {
-    emptyUploadRequest(path)
-      .withEntity(uploadRequestEntity(path.name, data))
+  override def uploadRequest(path: EntityPath, data: RequestEntity)(implicit nodes: Nodes, session: Session) = {
+    emptyUploadRequest(path).withEntity(data)
   }
 
   override def loginRequest(email: String, password: String): HttpRequest = {
