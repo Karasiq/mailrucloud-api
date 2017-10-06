@@ -66,7 +66,7 @@ trait MailCloudJsonClient extends MailCloudClient {
 
   def csrfToken(implicit session: Session): Future[CsrfToken] = {
     def extractHtmlPageId(response: HttpResponse): Future[String] = {
-      val regex = "pageId: '(\\w+)'".r
+      val regex = "pageId = '(\\w+)'".r
       response.entity
         .withSizeLimit(1048576)
         .dataBytes.fold(ByteString.empty)(_ ++ _)
