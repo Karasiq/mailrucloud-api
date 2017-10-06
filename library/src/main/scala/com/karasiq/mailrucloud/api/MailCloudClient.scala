@@ -36,7 +36,7 @@ trait MailCloudJsonClient extends MailCloudClient {
 
   def login(email: String, password: String): Future[Session] = {
     doHttpRequest(loginRequest(email, password))
-      .filter(_.headers.exists(h ⇒ h.is("location") && h.value().startsWith(BASE_DOMAIN)))
+      .filter(_.headers.exists(h ⇒ h.is("location") && h.value().startsWith(BaseDomain)))
       .map(response ⇒ Session(email, response.headers.collect { case `Set-Cookie`(cookie) ⇒ cookie }))
       .flatMap(addSdcToken)
   }

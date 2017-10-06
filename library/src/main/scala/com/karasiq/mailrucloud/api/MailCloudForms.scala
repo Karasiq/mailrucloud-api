@@ -28,7 +28,7 @@ trait DefaultMailCloudForms extends MailCloudForms { self: MailCloudConstants wi
 
     FormData(
       "new_auth_form" → "1",
-      "page" → BASE_DOMAIN,
+      "page" → BaseDomain,
       "Domain" → domain,
       "Login" → login,
       "Password" → password

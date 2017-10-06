@@ -3,22 +3,22 @@ package com.karasiq.mailrucloud.api
 import scala.language.postfixOps
 
 trait MailCloudUrls {
-  val BASE_DOMAIN: String
-  val AUTH_URL: String
-  val AUTH_SDC_URL: String
+  val BaseDomain: String
+  val AuthURL: String
+  val AuthSDCURL: String
 
-  def apiMethodUrl(method: String): String
+  def getApiMethodUrl(method: String): String
 }
 
 trait DefaultMailCloudUrls extends MailCloudUrls {
-  val BASE_DOMAIN = "https://cloud.mail.ru/"
-  val AUTH_URL = "https://auth.mail.ru/cgi-bin/auth"
-  val AUTH_SDC_URL = "https://auth.mail.ru/sdc?from=https%3A%2F%2Fcloud.mail.ru%2F"
+  val BaseDomain = "https://cloud.mail.ru/"
+  val AuthURL = "https://auth.mail.ru/cgi-bin/auth"
+  val AuthSDCURL = "https://auth.mail.ru/sdc?from=https%3A%2F%2Fcloud.mail.ru%2F"
 
-  assert(BASE_DOMAIN.endsWith("/"))
+  assert(BaseDomain.endsWith("/"))
 
-  def apiMethodUrl(method: String) = {
+  def getApiMethodUrl(method: String) = {
     assert(!method.startsWith("/"))
-    BASE_DOMAIN + "api/v2/" + method
+    BaseDomain + "api/v2/" + method
   }
 }
