@@ -28,8 +28,40 @@ lazy val testAppSettings = Seq(
   mainClass in Compile := Some("com.karasiq.mailrucloud.test.Main")
 )
 
+lazy val publishSettings = Seq(
+  publishMavenStyle := true,
+  publishTo := {
+    val nexus = "https://oss.sonatype.org/"
+    if (isSnapshot.value)
+      Some("snapshots" at nexus + "content/repositories/snapshots")
+    else
+      Some("releases" at nexus + "service/local/staging/deploy/maven2")
+  },
+  publishArtifact in Test := false,
+  pomIncludeRepository := { _ ⇒ false },
+  licenses := Seq("Apache License, Version 2.0" → url("http://opensource.org/licenses/Apache-2.0")),
+  homepage := Some(url("https://github.com/Karasiq/mailrucloud-api")),
+  pomExtra := <scm>
+    <url>git@github.com:Karasiq/mailrucloud-api.git</url>
+    <connection>scm:git:git@github.com:Karasiq/mailrucloud-api.git</connection>
+  </scm>
+    <developers>
+      <developer>
+        <id>karasiq</id>
+        <name>Piston Karasiq</name>
+        <url>https://github.com/Karasiq</url>
+      </developer>
+    </developers>
+)
+
+lazy val noPublishSettings = Seq(
+  publishArtifact := false,
+  publishArtifact in makePom := false,
+  publishTo := Some(Resolver.file("Repo", file("target/repo")))
+)
+
 lazy val library = project
-  .settings(commonSettings, librarySettings)
+  .settings(commonSettings, librarySettings, publishSettings)
   
 lazy val testApp = (project in file("test-app"))
   .settings(commonSettings, testAppSettings)
@@ -37,5 +69,5 @@ lazy val testApp = (project in file("test-app"))
   .enablePlugins(JavaAppPackaging)
 
 lazy val `mailrucloud-api` = (project in file("."))
-  .settings(commonSettings)
+  .settings(commonSettings, noPublishSettings)
   .aggregate(library)
