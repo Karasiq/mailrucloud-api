@@ -1,10 +1,11 @@
 package com.karasiq.mailrucloud.api
 
+import scala.language.postfixOps
+
 import akka.http.scaladsl.model._
+
 import com.karasiq.mailrucloud.api.MailCloudTypes.{CsrfToken, Session}
 import com.karasiq.mailrucloud.utils.MailCloudUtils
-
-import scala.language.postfixOps
 
 trait MailCloudForms {
   def loginForm(email: String, password: String): FormData

@@ -1,9 +1,10 @@
 package com.karasiq.mailrucloud.api
 
-import akka.http.scaladsl.model._
-import com.karasiq.mailrucloud.api.MailCloudTypes.{CsrfToken, EntityPath, Nodes, Session}
-
 import scala.language.postfixOps
+
+import akka.http.scaladsl.model._
+
+import com.karasiq.mailrucloud.api.MailCloudTypes.{CsrfToken, EntityPath, Nodes, Session}
 
 trait MailCloudRequests {
   def getRequest(method: String, data: (String, String)*)(implicit session: Session, token: CsrfToken): HttpRequest

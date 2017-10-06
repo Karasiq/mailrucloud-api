@@ -1,9 +1,9 @@
 package com.karasiq.mailrucloud.api
 
+import scala.language.postfixOps
+
 import upickle.Js
 import upickle.Js.Value
-
-import scala.language.postfixOps
 
 trait MailCloudJson extends upickle.AttributeTagged {
   import MailCloudTypes._

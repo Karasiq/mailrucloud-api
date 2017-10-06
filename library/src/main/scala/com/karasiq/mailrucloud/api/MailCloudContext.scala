@@ -1,12 +1,12 @@
 package com.karasiq.mailrucloud.api
 
+import scala.concurrent.{ExecutionContext, Future}
+import scala.language.postfixOps
+
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.stream.ActorMaterializer
-
-import scala.concurrent.{ExecutionContext, Future}
-import scala.language.postfixOps
 
 trait MailCloudContext {
   implicit val actorSystem: ActorSystem

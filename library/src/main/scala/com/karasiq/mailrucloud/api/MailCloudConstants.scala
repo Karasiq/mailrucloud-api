@@ -1,8 +1,8 @@
 package com.karasiq.mailrucloud.api
 
-import com.karasiq.mailrucloud.api.MailCloudTypes.EntityPath
-
 import scala.language.postfixOps
+
+import com.karasiq.mailrucloud.api.MailCloudTypes.EntityPath
 
 trait MailCloudConstants { 
   val ADVERTISED_BUILD: String

@@ -3,13 +3,13 @@ package com.karasiq.mailrucloud.api
 import java.io.IOException
 import java.net.URLEncoder
 
+import scala.language.{implicitConversions, postfixOps}
+import scala.util.Random
+
 import akka.http.scaladsl.model.HttpRequest
 import akka.http.scaladsl.model.headers.{Cookie, HttpCookie}
 import akka.util.ByteString
 import derive.key
-
-import scala.language.{implicitConversions, postfixOps}
-import scala.util.Random
 
 object MailCloudTypes {
   case class ApiResponse[T](email: String, body: T, time: Long, status: Int)

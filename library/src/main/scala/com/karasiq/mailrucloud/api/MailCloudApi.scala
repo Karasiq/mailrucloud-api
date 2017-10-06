@@ -1,13 +1,14 @@
 package com.karasiq.mailrucloud.api
 
-import akka.actor.ActorSystem
-import akka.http.scaladsl.model.HttpRequest
-import akka.util.ByteString
-import com.karasiq.mailrucloud.api.MailCloudTypes.{CsrfToken, Session}
-
 import scala.concurrent.Future
 import scala.language.{higherKinds, postfixOps}
 import scala.util.Try
+
+import akka.actor.ActorSystem
+import akka.http.scaladsl.model.HttpRequest
+import akka.util.ByteString
+
+import com.karasiq.mailrucloud.api.MailCloudTypes.{CsrfToken, Session}
 
 trait MailCloudApi { self: MailCloudRequests ⇒
   type ResponseParser[T]

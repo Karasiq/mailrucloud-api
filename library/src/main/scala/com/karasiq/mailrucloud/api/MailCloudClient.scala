@@ -1,15 +1,16 @@
 package com.karasiq.mailrucloud.api
 
-import akka.NotUsed
-import akka.actor.ActorSystem
-import akka.http.scaladsl.model.headers.{Location, `Set-Cookie`}
-import akka.http.scaladsl.model.{HttpEntity, HttpResponse}
-import akka.stream.scaladsl.{Sink, Source}
-import akka.util.ByteString
-import com.karasiq.mailrucloud.api.MailCloudTypes._
-
 import scala.concurrent.Future
 import scala.language.postfixOps
+
+import akka.NotUsed
+import akka.actor.ActorSystem
+import akka.http.scaladsl.model.{HttpEntity, HttpResponse}
+import akka.http.scaladsl.model.headers.{`Set-Cookie`, Location}
+import akka.stream.scaladsl.{Sink, Source}
+import akka.util.ByteString
+
+import com.karasiq.mailrucloud.api.MailCloudTypes._
 
 trait MailCloudClient {
   val api: MailCloudApi.MailCloudApiLike

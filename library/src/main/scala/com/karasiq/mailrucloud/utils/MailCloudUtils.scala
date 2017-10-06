@@ -1,10 +1,10 @@
 package com.karasiq.mailrucloud.utils
 
-import akka.http.scaladsl.model.HttpEntity.Chunked
-import akka.http.scaladsl.model.{ContentTypes, HttpEntity, Multipart, RequestEntity}
-import akka.util.ByteString
-
 import scala.language.postfixOps
+
+import akka.http.scaladsl.model.{ContentTypes, HttpEntity, Multipart, RequestEntity}
+import akka.http.scaladsl.model.HttpEntity.Chunked
+import akka.util.ByteString
 
 object MailCloudUtils {
   // Allows to create streaming upload request with known Content-Length

@@ -2,16 +2,17 @@ package com.karasiq.mailrucloud.test
 
 import java.nio.file.{Files, Paths, StandardOpenOption}
 
-import akka.actor.ActorSystem
-import akka.http.scaladsl.model.{ContentType, HttpEntity, MediaTypes}
-import akka.stream.scaladsl.FileIO
-import com.karasiq.mailrucloud.api.MailCloudClient
-import com.karasiq.mailrucloud.api.MailCloudTypes.EntityPath
-
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.io.StdIn
 import scala.language.{implicitConversions, postfixOps}
+
+import akka.actor.ActorSystem
+import akka.http.scaladsl.model.{ContentType, HttpEntity, MediaTypes}
+import akka.stream.scaladsl.FileIO
+
+import com.karasiq.mailrucloud.api.MailCloudClient
+import com.karasiq.mailrucloud.api.MailCloudTypes.EntityPath
 
 // Test application
 object Main extends App {
