@@ -1,6 +1,7 @@
 package com.karasiq.mailrucloud.api
 
 import scala.concurrent.Future
+import scala.concurrent.duration._
 import scala.language.postfixOps
 
 import akka.NotUsed
@@ -109,8 +110,16 @@ trait MailCloudJsonClient extends MailCloudClient {
   }
 
   override def upload(path: EntityPath, data: RequestEntity)(implicit nodes: Nodes, session: Session, token: CsrfToken): Future[EntityPath] = {
-    val future = doHttpRequest(uploadRequest(path, data))
-    parseUploadResult(path, data.contentLengthOption.getOrElse(throw new IllegalArgumentException("Content length required")), future)
+    val dataSize = data.contentLengthOption.getOrElse(throw new IllegalArgumentException("Content length required"))
+    if (dataSize <= 20) { // "too short body"
+      data.toStrict(5 seconds).flatMap { strictEntity ⇒
+        val hash = String.format("%040x", BigInt(1, strictEntity.data.padTo(20, 0: Byte).toArray).underlying())
+        post[EntityPath]("file/add", "home" → path.toString, "hash" → hash, "size" → dataSize.toString)
+      }
+    } else {
+      val future = doHttpRequest(uploadRequest(path, data))
+      parseUploadResult(path, dataSize, future)
+    }
   }
 
   private def parseUploadResult(path: EntityPath, size: Long, result: Future[HttpResponse])

@@ -1,5 +1,6 @@
 package com.karasiq.mailrucloud.test
 
+import java.io.File
 import java.nio.file.{Files, Paths, StandardOpenOption}
 
 import scala.concurrent.Await
@@ -8,7 +9,7 @@ import scala.io.StdIn
 import scala.language.{implicitConversions, postfixOps}
 
 import akka.actor.ActorSystem
-import akka.http.scaladsl.model.{ContentType, HttpEntity, MediaTypes}
+import akka.http.scaladsl.model.{ContentType, ContentTypes, HttpEntity, MediaTypes}
 import akka.stream.scaladsl.FileIO
 
 import com.karasiq.mailrucloud.api.MailCloudClient
@@ -47,6 +48,8 @@ object Main extends App {
     val uploadResult = Await.result(cloud.upload(testJpg, HttpEntity.Default(ContentType(MediaTypes.`image/jpeg`), Files.size(localTestJpg), FileIO.fromPath(localTestJpg))), Duration.Inf)
     println(s"UPLOADED: $uploadResult")
   }
+
+  Await.result(cloud.upload("TestFolder/test.txt", HttpEntity(ContentTypes.`application/octet-stream`, new File("test.txt"))), Duration.Inf)
 
   Iterator.continually(StdIn.readLine())
     .takeWhile(null ne)
