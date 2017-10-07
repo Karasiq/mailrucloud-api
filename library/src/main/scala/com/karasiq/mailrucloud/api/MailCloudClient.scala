@@ -113,7 +113,7 @@ trait MailCloudJsonClient extends MailCloudClient {
     val dataSize = data.contentLengthOption.getOrElse(throw new IllegalArgumentException("Content length required"))
     if (dataSize <= 20) { // "too short body"
       data.toStrict(5 seconds).flatMap { strictEntity ⇒
-        val hash = String.format("%040x", BigInt(1, strictEntity.data.padTo(20, 0: Byte).toArray).underlying())
+        val hash = String.format("%x", BigInt(1, strictEntity.data.padTo(20, 0: Byte).toArray).underlying())
         post[EntityPath]("file/add", "home" → path.toString, "hash" → hash, "size" → dataSize.toString)
       }
     } else {
@@ -126,12 +126,7 @@ trait MailCloudJsonClient extends MailCloudClient {
                                (implicit nodes: Nodes, session: Session, token: CsrfToken) = {
     result
       .flatMap(_.entity.withSizeLimit(1000).dataBytes.runFold(ByteString.empty)(_ ++ _))
-      .map { bs ⇒
-        val hash = bs.utf8String
-        require(hash.matches("[a-fA-F0-9]{40}"), "Invalid hash: " + hash)
-        hash 
-      }
-      .flatMap(hash ⇒ post[EntityPath]("file/add", "home" → path.toString, "hash" → hash, "size" → size.toString))
+      .flatMap(hash ⇒ post[EntityPath]("file/add", "home" → path.toString, "hash" → hash.utf8String, "size" → size.toString))
   }
 
   def createFolder(path: EntityPath)(implicit session: Session, token: CsrfToken): Future[EntityPath] = {
