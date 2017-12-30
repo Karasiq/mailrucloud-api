@@ -18,7 +18,7 @@ lazy val librarySettings = Seq(
       "com.typesafe.akka" %% "akka-actor" % akkaV,
       "com.typesafe.akka" %% "akka-stream" % akkaV,
       "com.typesafe.akka" %% "akka-http" % akkaHttpV,
-      "com.lihaoyi" %% "upickle" % "0.4.4"
+      "com.typesafe.play" %% "play-json" % "2.6.0"
     )
   }
 )

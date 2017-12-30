@@ -2,39 +2,27 @@ package com.karasiq.mailrucloud.api
 
 import scala.language.postfixOps
 
-import upickle.Js
-import upickle.Js.Value
+import play.api.libs.json._
 
-trait MailCloudJson extends upickle.AttributeTagged {
+trait MailCloudJson {
   import MailCloudTypes._
 
-  override implicit val LongRW: ReadWriter[Long] = ReadWriter[Long](
-    value ⇒ Js.Num(value),
-    { case Js.Num(value) ⇒ value.toLong }
-  )
+  implicit val fileFormat = Json.format[File]
+  implicit val folderFormat = Json.format[Folder]
 
-  implicit val FolderRW: ReadWriter[Folder] = macroRW[Folder]
-
-  implicit val EntityRW: Writer[Entity] with Reader[Entity] = new Writer[Entity] with Reader[Entity] {
-    def write0: (Entity) => Value = {
-      case file: File ⇒
-        writeJs(file)
-
-      case folder: Folder ⇒
-        writeJs(folder)
-    }
-
-    def read0: PartialFunction[Value, Entity] = {
-      case obj: Js.Obj if obj("type") == Js.Str("file") ⇒
-        readJs[File](obj)
-
-      case obj: Js.Obj if obj("type") == Js.Str("folder") ⇒
-        readJs[Folder](obj)
+  implicit val entityWrites = Json.writes[Entity]
+  implicit val entityReads = Reads[Entity] { value ⇒
+    (value \ "type").as[String] match {
+      case "file" ⇒ JsSuccess(value.as[File])
+      case "folder" ⇒ JsSuccess(value.as[Folder])
+      case t ⇒ JsError(s"Invalid entity type: $t")
     }
   }
 
-  implicit val EntityPathRW = ReadWriter[EntityPath](
-    path ⇒ Js.Str(path.toString),
-    { case Js.Str(str) ⇒ EntityPath(str) }
+  implicit val entityPathFormat = Format[EntityPath](
+    Reads(value ⇒ JsSuccess(EntityPath(value.as[String]))),
+    Writes(path ⇒ JsString(path.toString))
   )
+
+  implicit def apiResponseFormat[T: Format] = Json.format[ApiResponse[T]]
 }

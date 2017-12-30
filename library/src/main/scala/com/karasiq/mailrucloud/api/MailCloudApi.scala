@@ -7,6 +7,7 @@ import scala.util.Try
 import akka.actor.ActorSystem
 import akka.http.scaladsl.model.HttpRequest
 import akka.util.ByteString
+import play.api.libs.json.{Json, Reads}
 
 import com.karasiq.mailrucloud.api.MailCloudTypes.{CsrfToken, Session}
 
@@ -26,7 +27,7 @@ trait MailCloudApi { self: MailCloudRequests ⇒
 trait MailCloudJsonApi extends MailCloudApi with MailCloudJson { self: MailCloudConstants with MailCloudForms with MailCloudUrls with MailCloudRequests ⇒
   import MailCloudTypes._
 
-  override type ResponseParser[T] = Reader[T]
+  override type ResponseParser[T] = Reads[T]
 
   def executeApiRequest[T: ResponseParser](request: HttpRequest)(implicit ctx: MailCloudContext): Future[T] = {
     import ctx._
@@ -34,12 +35,12 @@ trait MailCloudJsonApi extends MailCloudApi with MailCloudJson { self: MailCloud
       .flatMap(_.entity.dataBytes.runFold(ByteString.empty)(_ ++ _))
       .map { bs ⇒
         val responseStr = bs.utf8String
-        val response = read[ApiResponse[upickle.Js.Value]](responseStr)
-        if (response.status != 200) {
-          val errorStr = Try(response.body.obj("home")("error").str).toOption
+        val response = Json.parse(responseStr)
+        if (!(response \ "status").asOpt[Int].contains(200)) {
+          val errorStr = (response \ "body" \ "home" \ "error").asOpt[String]
           throw ApiException(request, bs, errorStr)
         }
-        readJs[T](response.body)
+        response.as[ApiResponse[T]].body
       }
   }
 }

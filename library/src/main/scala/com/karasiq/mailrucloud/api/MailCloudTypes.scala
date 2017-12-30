@@ -9,7 +9,6 @@ import scala.util.Random
 import akka.http.scaladsl.model.HttpRequest
 import akka.http.scaladsl.model.headers.{Cookie, HttpCookie}
 import akka.util.ByteString
-import derive.key
 
 object MailCloudTypes {
   case class ApiResponse[T](email: String, body: T, time: Long, status: Int)
@@ -56,7 +55,7 @@ object MailCloudTypes {
     def `type`: String
     def kind: String
     def name: String
-    def path: String
+    def home: String
     def size: Long
     def rev: Int
     def grev: Int
@@ -70,10 +69,10 @@ object MailCloudTypes {
   object EntityCount {
     val empty = EntityCount()
   }
-  case class File(`type`: String, kind: String, name: String, @key("home") path: String, size: Long, hash: String, rev: Int = 0, grev: Int = 0) extends Entity {
+  case class File(`type`: String, kind: String, name: String, home: String, size: Long, hash: String, rev: Int = 0, grev: Int = 0) extends Entity {
     require(`type` == "file")
   }
-  case class Folder(`type`: String, kind: String, name: String, @key("home") path: String, size: Long, tree: String, rev: Int = 0, grev: Int = 0, count: EntityCount = EntityCount.empty, list: Seq[Entity] = Nil) extends Entity {
+  case class Folder(`type`: String, kind: String, name: String, home: String, size: Long, tree: String, rev: Int = 0, grev: Int = 0, count: EntityCount = EntityCount.empty, list: Seq[Entity] = Nil) extends Entity {
     require(`type` == "folder")
   }
 
