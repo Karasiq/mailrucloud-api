@@ -11,10 +11,10 @@ import akka.http.scaladsl.model.headers.{Cookie, HttpCookie}
 import akka.util.ByteString
 
 object MailCloudTypes {
-  case class ApiResponse[T](email: String, body: T, time: Long, status: Int)
-  case class ApiException(request: HttpRequest, response: ByteString, errorName: Option[String], cause: Throwable = null) extends IOException(s"Cloud.Mail.Ru API request failed: ${request.uri} (${errorName.getOrElse(response.utf8String)})", cause)
+  final case class ApiResponse[T](email: String, body: T, time: Long, status: Int)
+  final case class ApiException(request: HttpRequest, response: ByteString, errorName: Option[String], cause: Throwable = null) extends IOException(s"Cloud.Mail.Ru API request failed: ${request.uri} (${errorName.getOrElse(response.utf8String)})", cause)
 
-  case class Space(overquota: Boolean, used: Int, total: Int) {
+  final case class Space(overquota: Boolean, used: Int, total: Int) {
     override def toString: String = {
       def asGb(i: Int) = f"${i.toDouble / 1024}%.2f GB"
       s"[${asGb(used)} of ${asGb(total)} used]"
@@ -29,7 +29,7 @@ object MailCloudTypes {
     val root: EntityPath = "/"
   }
 
-  case class EntityPath(path: Seq[String]) {
+  final case class EntityPath(path: Seq[String]) {
     def /(str: String) = {
       copy(path :+ str)
     }
@@ -61,32 +61,30 @@ object MailCloudTypes {
     def grev: Int
   }
 
-  case class EntityCount(folders: Int = 0, files: Int = 0) {
+  final case class EntityCount(folders: Int = 0, files: Int = 0) {
     override def toString: String = {
       s"[$folders folders, $files files]"
     }
   }
+
   object EntityCount {
     val empty = EntityCount()
   }
-  case class File(`type`: String, kind: String, name: String, home: String, size: Long, hash: String, rev: Int = 0, grev: Int = 0) extends Entity {
-    require(`type` == "file")
-  }
-  case class Folder(`type`: String, kind: String, name: String, home: String, size: Long, tree: String, rev: Int = 0, grev: Int = 0, count: EntityCount = EntityCount.empty, list: Seq[Entity] = Nil) extends Entity {
-    require(`type` == "folder")
-  }
 
-  case class Node(count: Int, url: String)
-  case class Nodes(get: Seq[Node], upload: Seq[Node]) {
+  final case class File(`type`: String, kind: String, name: String, home: String, size: Long, hash: String, rev: Int = 0, grev: Int = 0) extends Entity
+  final case class Folder(`type`: String, kind: String, name: String, home: String, size: Long, tree: String, rev: Int = 0, grev: Int = 0, count: EntityCount = EntityCount.empty, list: Seq[Entity] = Nil) extends Entity
+
+  final case class Node(count: String, url: String)
+  final case class Nodes(get: Seq[Node], upload: Seq[Node]) {
     def random: (String, String) = {
       require(get.nonEmpty && upload.nonEmpty)
       (get(Random.nextInt(get.length)).url, upload(Random.nextInt(upload.length)).url)
     }
   }
 
-  case class ApiCsrfToken(token: String)
-  case class CsrfToken(pageId: String, token: String)
-  case class Session(email: String, cookies: Seq[HttpCookie]) {
+  final case class ApiCsrfToken(token: String)
+  final case class CsrfToken(pageId: String, token: String)
+  final case class Session(email: String, cookies: Seq[HttpCookie]) {
     def header: Cookie = {
       Cookie(cookies.map(_.pair).toVector)
     }
