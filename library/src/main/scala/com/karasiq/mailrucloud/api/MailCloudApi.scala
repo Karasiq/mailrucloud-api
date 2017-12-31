@@ -2,7 +2,6 @@ package com.karasiq.mailrucloud.api
 
 import scala.concurrent.Future
 import scala.language.{higherKinds, postfixOps}
-import scala.util.Try
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.model.HttpRequest
@@ -31,16 +30,23 @@ trait MailCloudJsonApi extends MailCloudApi with MailCloudJson { self: MailCloud
 
   def executeApiRequest[T: ResponseParser](request: HttpRequest)(implicit ctx: MailCloudContext): Future[T] = {
     import ctx._
+
+    def extractError(bs: ByteString): Option[ApiException] = {
+      val response = Json.parse(bs.toArray)
+      (response \ "status").asOpt[Int].filterNot(_ == 200).map { _ ⇒
+        val errorStr = (response \ "body" \ "home" \ "error").asOpt[String]
+        ApiException(request, bs, errorStr)
+      }
+    }
+
     doHttpRequest(request)
       .flatMap(_.entity.dataBytes.runFold(ByteString.empty)(_ ++ _))
+      .recoverWith { case e: ApiException ⇒ Future.failed(extractError(e.response).map(_.copy(cause = e)).getOrElse(e)) }
       .map { bs ⇒
-        val responseStr = bs.utf8String
-        val response = Json.parse(responseStr)
-        if (!(response \ "status").asOpt[Int].contains(200)) {
-          val errorStr = (response \ "body" \ "home" \ "error").asOpt[String]
-          throw ApiException(request, bs, errorStr)
-        }
-        response.as[ApiResponse[T]].body
+        extractError(bs).foreach(throw _)
+        val json = Json.parse(bs.toArray)
+        // json.as[ApiResponse[T]].body
+        (json \ "body").as[T]
       }
   }
 }
