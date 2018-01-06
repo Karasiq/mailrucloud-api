@@ -1,0 +1,8 @@
+package com.karasiq.mailrucloud.api.impl
+
+import com.karasiq.mailrucloud.api.MailCloudProviders
+import com.karasiq.mailrucloud.api.impl.json.{MailCloudJsonApiProvider, MailCloudJsonFormatsProvider}
+
+trait MailCloudDefaults extends MailCloudProviders with DefaultMailCloudConstantsProvider with DefaultMailCloudRequestsProvider
+  with DefaultMailCloudFormsProvider with DefaultMailCloudUrlsProvider with MailCloudJsonFormatsProvider
+  with MailCloudJsonApiProvider

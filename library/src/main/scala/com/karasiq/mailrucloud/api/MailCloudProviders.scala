@@ -1,0 +1,5 @@
+package com.karasiq.mailrucloud.api
+
+trait MailCloudProviders extends MailCloudConstantsProvider with MailCloudRequestsProvider
+  with MailCloudFormsProvider with MailCloudUrlsProvider
+  with MailCloudContextProvider with MailCloudApiProvider

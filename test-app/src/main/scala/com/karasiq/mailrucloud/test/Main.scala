@@ -33,7 +33,7 @@ object Main extends App {
   implicit val nodes = Await.result(cloud.nodes, Duration.Inf)
   println(nodes)
 
-  val listing = Await.result(cloud.folder(cloud.api.RootFolder), Duration.Inf)
+  val listing = Await.result(cloud.folder(cloud.constants.RootFolder), Duration.Inf)
   println(listing)
 
   val folderResult = Await.result(for (_ ← cloud.delete("Testfolder"); r ← cloud.createFolder("Testfolder")) yield r, Duration.Inf)

@@ -1,13 +1,15 @@
-package com.karasiq.mailrucloud.api
-
-import scala.language.postfixOps
+package com.karasiq.mailrucloud.api.impl.json
 
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
-import play.api.libs.json.Reads._
+import Reads._
 
-trait MailCloudJson {
-  import MailCloudTypes._
+import com.karasiq.mailrucloud.api.{MailCloudFormats, MailCloudFormatsProvider}
+
+class MailCloudJsonFormats extends MailCloudFormats  {
+  import com.karasiq.mailrucloud.api.MailCloudTypes._
+
+  override type FormatT[T] = Format[T]
 
   /* implicit val intFormat = Format[Int](
     Reads {
@@ -89,5 +91,9 @@ trait MailCloudJson {
     }
   ) */
 
-  implicit def apiResponseReads[T: Reads] = Json.reads[ApiResponse[T]]
+  implicit def apiResponseFormat[T: Format] = Json.format[ApiResponse[T]]
+}
+
+trait MailCloudJsonFormatsProvider extends MailCloudFormatsProvider {
+  val formats = new MailCloudJsonFormats
 }
