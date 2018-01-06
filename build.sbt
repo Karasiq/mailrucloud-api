@@ -1,6 +1,6 @@
 lazy val commonSettings = Seq(
   organization := "com.github.karasiq",
-  version := "1.0.2",
+  version := "1.1.0",
   isSnapshot := version.value.endsWith("SNAPSHOT"),
   scalaVersion := "2.12.3",
   crossScalaVersions := Seq("2.11.11", "2.12.3"),
@@ -64,7 +64,7 @@ lazy val library = project
   .settings(commonSettings, librarySettings, publishSettings)
   
 lazy val testApp = (project in file("test-app"))
-  .settings(commonSettings, testAppSettings)
+  .settings(commonSettings, testAppSettings, noPublishSettings)
   .dependsOn(library)
   .enablePlugins(JavaAppPackaging)
 
