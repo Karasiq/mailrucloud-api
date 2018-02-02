@@ -30,7 +30,8 @@ class DefaultMailCloudForms(constants: MailCloudConstants, urls: MailCloudUrls) 
       "api" → "2",
       "build" → constants.AdvertisedBuild,
       "email" → session.email,
-      "x-email" → session.email
+      "x-email" → session.email,
+      "_" → System.currentTimeMillis().toString
     ) ++ data:_*)
   }
 

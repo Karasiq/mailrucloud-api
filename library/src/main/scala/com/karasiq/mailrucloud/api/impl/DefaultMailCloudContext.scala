@@ -13,7 +13,7 @@ import com.karasiq.mailrucloud.api.MailCloudContext
 import com.karasiq.mailrucloud.api.MailCloudTypes.ApiException
 
 class DefaultMailCloudContext(implicit val actorSystem: ActorSystem) extends MailCloudContext {
-  implicit val actorMaterializer = ActorMaterializer()
+  implicit val materializer = ActorMaterializer()
   implicit val executionContext = actorSystem.dispatcher
   val akkaHttp = Http()
 

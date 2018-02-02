@@ -3,6 +3,7 @@ package com.karasiq.mailrucloud.api.impl.json
 import scala.concurrent.Future
 
 import akka.http.scaladsl.model.HttpRequest
+import akka.stream.scaladsl.{Sink, Source}
 import akka.util.ByteString
 import play.api.libs.json.Json
 
@@ -26,15 +27,17 @@ abstract class MailCloudJsonApi(context: MailCloudContext, constants: MailCloudC
       }
     }
 
-    doHttpRequest(request)
-      .flatMap(_.entity.dataBytes.runFold(ByteString.empty)(_ ++ _))
-      .recoverWith { case e: ApiException ⇒ Future.failed(extractError(e.response).map(_.copy(cause = e)).getOrElse(e)) }
-      .map { bs ⇒
-        extractError(bs).foreach(throw _)
-        val json = Json.parse(bs.toArray)
+    Source.fromFuture(doHttpRequest(request))
+      .flatMapConcat(_.entity.dataBytes.fold(ByteString.empty)(_ ++ _))
+      .recoverWithRetries(1, { case ae: ApiException ⇒ Source.failed(extractError(ae.response).map(_.copy(cause = ae)).getOrElse(ae)) })
+      .map { bytes ⇒
+        extractError(bytes).foreach(throw _)
+        val json = Json.parse(bytes.toArray)
         // json.as[ApiResponse[T]].body
         (json \ "body").as[T]
       }
+      .named("executeApiRequest")
+      .runWith(Sink.head)
   }
 }
 

@@ -70,12 +70,12 @@ trait MailCloudJsonClient extends MailCloudClient with MailCloudJsonApiProvider 
     get[Space]("user/space")
   }
 
-  def file(path: EntityPath)(implicit session: Session, token: CsrfToken): Future[File] = {
+  def file(path: EntityPath)(implicit session: Session, token: CsrfToken): Future[Entity] = {
     get[File]("file", "home" → path.toString)
   }
 
-  def folder(path: EntityPath)(implicit session: Session, token: CsrfToken): Future[Folder] = {
-    get[Folder]("folder", "home" → path.toString)
+  def folder(path: EntityPath, offset: Long, limit: Long)(implicit session: Session, token: CsrfToken): Future[Folder] = {
+    get[Folder]("folder", "home" → path.toString, "offset" → offset.toString, "limit" → limit.toString)
   }
 
   def nodes(implicit session: Session, token: CsrfToken): Future[Nodes] = {
@@ -101,16 +101,19 @@ trait MailCloudJsonClient extends MailCloudClient with MailCloudJsonApiProvider 
         post[EntityPath]("file/add", "home" → path.toString, "hash" → hash, "size" → dataSize.toString)
       }
     } else {
-      val future = doHttpRequest(requests.uploadRequest(path, data))
-      parseUploadResult(path, dataSize, future)
-    }
-  }
+      def registerUploadedFile(path: EntityPath, size: Long, result: Future[HttpResponse])
+                              (implicit nodes: Nodes, session: Session, token: CsrfToken) = {
 
-  private def parseUploadResult(path: EntityPath, size: Long, result: Future[HttpResponse])
-                               (implicit nodes: Nodes, session: Session, token: CsrfToken) = {
-    result
-      .flatMap(_.entity.withSizeLimit(1000).dataBytes.runFold(ByteString.empty)(_ ++ _))
-      .flatMap(hash ⇒ post[EntityPath]("file/add", "home" → path.toString, "hash" → hash.utf8String, "size" → size.toString))
+        Source.fromFuture(result)
+          .flatMapConcat(_.entity.withSizeLimit(1000).dataBytes.fold(ByteString.empty)(_ ++ _))
+          .mapAsync(1)(hash ⇒ post[EntityPath]("file/add", "home" → path.toString, "hash" → hash.utf8String, "size" → size.toString))
+          .named("registerUploadedFile")
+          .runWith(Sink.head)
+      }
+
+      val hashFuture = doHttpRequest(requests.uploadRequest(path, data))
+      registerUploadedFile(path, dataSize, hashFuture)
+    }
   }
 
   def createFolder(path: EntityPath)(implicit session: Session, token: CsrfToken): Future[EntityPath] = {
