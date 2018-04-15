@@ -51,11 +51,12 @@ trait MailCloudJsonClient extends MailCloudClient with MailCloudJsonApiProvider 
 
   def csrfToken(implicit session: Session): Future[CsrfToken] = {
     def extractHtmlPageId(response: HttpResponse): Future[String] = {
-      val regex = "pageId = '(\\w+)'".r
+      val regex = "pageId:\"(\\w+)\"".r
       response.entity
         .withSizeLimit(1048576)
         .dataBytes.fold(ByteString.empty)(_ ++ _)
         .mapConcat(bs ⇒ regex.findFirstMatchIn(bs.utf8String).map(_.group(1)).toList)
+        .orElse(Source.single(""))
         .runWith(Sink.head)
     }
     doHttpRequest(requests.cloudHomeRequest)
