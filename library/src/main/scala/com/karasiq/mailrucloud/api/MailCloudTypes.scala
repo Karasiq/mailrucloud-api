@@ -14,9 +14,9 @@ object MailCloudTypes {
   final case class ApiResponse[T](email: String, body: T, time: Long, status: Int)
   final case class ApiException(request: HttpRequest, response: ByteString, errorName: Option[String], cause: Throwable = null) extends IOException(s"Cloud.Mail.Ru API request failed: ${request.uri} (${errorName.getOrElse(response.utf8String)})", cause)
 
-  final case class Space(overquota: Boolean, used: Int, total: Int) {
+  final case class Space(overquota: Boolean, used: Long, total: Long) {
     override def toString: String = {
-      def asGb(i: Int) = f"${i.toDouble / 1024}%.2f GB"
+      def asGb(i: Long) = f"${i.toDouble / 1024 / 1024 / 1024}%.2f GB"
       s"[${asGb(used)} of ${asGb(total)} used]"
     }
   }

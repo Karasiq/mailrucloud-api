@@ -32,7 +32,21 @@ class MailCloudJsonFormats extends MailCloudFormats  {
   implicit val apiCsrfTokenFormat = Json.format[ApiCsrfToken]
   implicit val nodeFormat = Json.format[Node]
   implicit val nodesFormat = Json.format[Nodes]
-  implicit val spaceFormat = Json.format[Space]
+  implicit val spaceFormat = {
+    implicit val spaceReads: Reads[Space] = (
+      (JsPath \ "overquota").readWithDefault(false) and
+        (JsPath \ "bytes_used").readWithDefault(0L) and
+        (JsPath \ "bytes_total").readWithDefault(Long.MaxValue)
+      )(Space.apply _)
+
+    implicit val spaceWrites: Writes[Space] = (
+      (JsPath \ "overquota").write[Boolean] and
+        (JsPath \ "bytes_used").write[Long] and
+        (JsPath \ "bytes_total").write[Long]
+      )(unlift(Space.unapply))
+
+    Format(spaceReads, spaceWrites)
+  }
 
   implicit val entityCountFormat = Json.format[EntityCount]
   implicit val entityPathFormat = Format[EntityPath](
