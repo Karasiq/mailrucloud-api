@@ -90,7 +90,7 @@ trait MailCloudJsonClient extends MailCloudClient with MailCloudJsonApiProvider 
   def download(path: EntityPath)(implicit nodes: Nodes, session: Session, token: CsrfToken): Source[ByteString, NotUsed] = {
     Source.fromFuture(file(path))
       .map((_, requests.downloadRequest(path)))
-      .mapAsync(1) { case (file, request) ⇒ doHttpRequest(request).map((file, _)) }
+      .mapAsync(1) { case (file, request) ⇒ doHttpRequest(request, handleRedirects = true).map((file, _)) }
       .flatMapConcat { case (file, response) ⇒ response.entity.withSizeLimit(file.size).dataBytes }
   }
 

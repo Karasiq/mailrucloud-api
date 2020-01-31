@@ -7,13 +7,13 @@ import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.io.StdIn
 import scala.language.{implicitConversions, postfixOps}
-
 import akka.actor.ActorSystem
 import akka.http.scaladsl.model.{ContentType, ContentTypes, HttpEntity, MediaTypes}
-import akka.stream.scaladsl.FileIO
-
+import akka.stream.scaladsl.{FileIO, Sink}
 import com.karasiq.mailrucloud.api.MailCloudClient
 import com.karasiq.mailrucloud.api.MailCloudTypes.EntityPath
+
+import scala.util.{Failure, Success}
 
 // Test application
 object Main extends App {
@@ -53,6 +53,20 @@ object Main extends App {
 
   Iterator.continually(StdIn.readLine())
     .takeWhile(null ne)
-    .foreach(file ⇒ cloud.download(file)
-      .runWith(FileIO.toPath(Paths.get(EntityPath(file).name), Set(StandardOpenOption.WRITE, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING))))
+    .foreach { file =>
+      val path = Paths.get("Downloaded", EntityPath(file).name)
+      Files.createDirectories(path.getParent)
+
+      val sink = FileIO.toPath(path, Set(StandardOpenOption.WRITE, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING))
+      cloud.download(file)
+        .alsoTo(Sink.onComplete {
+          case Success(_) =>
+            println(s"DOWNLOADED: $file")
+
+          case Failure(exception) =>
+            println(s"Error downloading $file")
+            exception.printStackTrace()
+        })
+        .runWith(sink)
+    }
 }

@@ -13,7 +13,7 @@ trait MailCloudContext {
   implicit val actorSystem: ActorSystem
   implicit val materializer: Materializer
   implicit val executionContext: ExecutionContext
-  def doHttpRequest(request: HttpRequest): Future[HttpResponse]
+  def doHttpRequest(request: HttpRequest, handleRedirects: Boolean = false): Future[HttpResponse]
 }
 
 trait MailCloudContextProvider {
