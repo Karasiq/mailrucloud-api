@@ -1,18 +1,29 @@
 package com.karasiq.mailrucloud.api.impl
 
 import akka.http.scaladsl.model.{HttpMethods, HttpRequest, RequestEntity, Uri}
+import akka.http.scaladsl.model.headers.{`User-Agent`, RawHeader, Referer}
 
 import com.karasiq.mailrucloud.api._
 
 class DefaultMailCloudRequests(constants: MailCloudConstants, forms: MailCloudForms, urls: MailCloudUrls) extends MailCloudRequests {
   import MailCloudTypes._
 
+  private[this] def defaultHeaders(implicit token: CsrfToken) = Vector(
+    Referer("https://cloud.mail.ru/home/"),
+    RawHeader("Sec-Fetch-Dest", "empty"),
+    RawHeader("Sec-Fetch-Mode", "cors"),
+    RawHeader("Sec-Fetch-Site", "same-origin"),
+    `User-Agent`("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.106 Safari/537.36"),
+    RawHeader("X-CSRF-Token", token.token),
+    RawHeader("X-Requested-With", "XMLHttpRequest")
+  )
+
   override def getRequest(method: String, data: (String, String)*)(implicit session: Session, token: CsrfToken): HttpRequest = {
-    HttpRequest(HttpMethods.GET, Uri(urls.apiMethodUrl(method)).withQuery(forms.apiRequestQuery(session, token, data:_*).fields), Vector(session.header))
+    HttpRequest(HttpMethods.GET, Uri(urls.apiMethodUrl(method)).withQuery(forms.apiRequestQuery(session, token, data: _*).fields), defaultHeaders :+ session.header)
   }
 
   override def postRequest(method: String, data: (String, String)*)(implicit session: Session, token: CsrfToken): HttpRequest = {
-    HttpRequest(HttpMethods.POST, urls.apiMethodUrl(method), Vector(session.header), forms.apiRequestQuery(session, token, data:_*).toEntity)
+    HttpRequest(HttpMethods.POST, urls.apiMethodUrl(method), defaultHeaders :+ session.header, forms.apiRequestQuery(session, token, data: _*).toEntity)
   }
 
   override def downloadRequest(path: EntityPath)(implicit nodes: Nodes, session: Session): HttpRequest = {

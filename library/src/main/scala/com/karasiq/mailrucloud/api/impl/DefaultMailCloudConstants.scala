@@ -4,7 +4,7 @@ import com.karasiq.mailrucloud.api.{MailCloudConstants, MailCloudConstantsProvid
 import com.karasiq.mailrucloud.api.MailCloudTypes.EntityPath
 
 object DefaultMailCloudConstants extends MailCloudConstants {
-  val AdvertisedBuild = sys.props.getOrElse("mailru.cloud.build", "hotfix_CLOUDWEB-7710_50-0-1.201710021758")
+  val AdvertisedBuild = sys.props.getOrElse("mailru.cloud.build", "cloudweb-11600-72-4-0.202011271755")
   val RootFolder = EntityPath.root
 }
 

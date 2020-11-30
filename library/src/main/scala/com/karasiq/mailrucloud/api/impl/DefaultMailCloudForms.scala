@@ -32,11 +32,11 @@ class DefaultMailCloudForms(constants: MailCloudConstants, urls: MailCloudUrls) 
       "email" → session.email,
       "x-email" → session.email,
       "_" → System.currentTimeMillis().toString
-    ) ++ data:_*)
+    ) ++ data: _*)
   }
 
   override def apiRequestQuery(session: Session, token: CsrfToken, data: (String, String)*): FormData = {
-    apiRequestQuery(session, Seq("x-page-id" → token.pageId, "token" → token.token) ++ data:_*)
+    apiRequestQuery(session, Seq("x-page-id" → token.pageId /*, "token" → token.token */) ++ data: _*)
   }
 }
 
